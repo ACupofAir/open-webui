@@ -41,10 +41,12 @@ def apply_model_params_to_body(
 
 
 # inplace function: form_data is modified
+# [JuneNote] the num_ctx not sent to openai api, max_token generate is well-worked
 def apply_model_params_to_body_openai(params: dict, form_data: dict) -> dict:
     mappings = {
         "temperature": float,
         "top_p": float,
+        "num_ctx": int,
         "max_tokens": int,
         "frequency_penalty": float,
         "seed": lambda x: x,

@@ -1,3 +1,4 @@
+import time
 import asyncio
 import hashlib
 import json
@@ -7,6 +8,7 @@ from typing import Literal, Optional, overload
 
 import aiohttp
 import requests
+import tiktoken
 from open_webui.apps.webui.models.models import Models
 from open_webui.config import (
     CACHE_DIR,
@@ -16,6 +18,7 @@ from open_webui.config import (
     MODEL_FILTER_LIST,
     OPENAI_API_BASE_URLS,
     OPENAI_API_KEYS,
+    TIKTOKEN_ENCODING_NAME,
     AppConfig,
 )
 from open_webui.env import (
@@ -42,7 +45,11 @@ log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS["OPENAI"])
 
 
-app = FastAPI(docs_url="/docs" if ENV == "dev" else None, openapi_url="/openapi.json" if ENV == "dev" else None, redoc_url=None)
+app = FastAPI(
+    docs_url="/docs" if ENV == "dev" else None,
+    openapi_url="/openapi.json" if ENV == "dev" else None,
+    redoc_url=None,
+)
 
 
 app.add_middleware(
@@ -61,6 +68,7 @@ app.state.config.MODEL_FILTER_LIST = MODEL_FILTER_LIST
 app.state.config.ENABLE_OPENAI_API = ENABLE_OPENAI_API
 app.state.config.OPENAI_API_BASE_URLS = OPENAI_API_BASE_URLS
 app.state.config.OPENAI_API_KEYS = OPENAI_API_KEYS
+app.state.config.TIKTOKEN_ENCODING_NAME = TIKTOKEN_ENCODING_NAME
 
 app.state.MODELS = {}
 
@@ -381,6 +389,9 @@ async def generate_chat_completion(
     user=Depends(get_verified_user),
 ):
     idx = 0
+    print("======================DEBUG START: form_data======================")
+    print(form_data)
+    print("======================DEBUG  END : form_data======================")
     payload = {**form_data}
 
     if "metadata" in payload:
@@ -389,6 +400,7 @@ async def generate_chat_completion(
     model_id = form_data.get("model")
     model_info = Models.get_model_by_id(model_id)
 
+    # [JuneNote] model_info is None in openai api chat/completions
     if model_info:
         if model_info.base_model_id:
             payload["model"] = model_info.base_model_id
@@ -428,6 +440,52 @@ async def generate_chat_completion(
     # Fix: O1 does not support the "system" parameter, Modify "system" to "user"
     if is_o1 and payload["messages"][0]["role"] == "system":
         payload["messages"][0]["role"] = "user"
+
+    # [JuneNote] I think here should handle prompt length to match the max_token_length
+    print("======================DEBUG START: payload======================")
+    print(payload)
+    start_time = time.time()
+    # encoding = tiktoken.get_encoding("cl100k_base")
+
+    encoding = tiktoken.get_encoding(str(app.state.config.TIKTOKEN_ENCODING_NAME))
+
+    if "num_ctx" in payload:
+        max_prompt_token_length = int(payload["num_ctx"] * 0.95)
+        del payload["num_ctx"]
+    else:
+        max_prompt_token_length = 2048
+    print('======================DEBUG START: max_prompt_token_length======================')
+    print(max_prompt_token_length)
+    print('======================DEBUG  END : max_prompt_token_length======================')
+
+    # Calculate the total tokens in all messages
+    total_tokens_length = sum(
+        len(encoding.encode(message["content"]))
+        for message in payload["messages"]
+        if "content" in message
+    )
+    end_time = time.time()
+    print(f"DEBUG: Time elapsed: {end_time - start_time}")
+
+    # If total tokens exceed max_token_length, truncate messages from first to last
+    if total_tokens_length > max_prompt_token_length:
+        tokens_to_remove = total_tokens_length - max_prompt_token_length
+        for message in payload["messages"]:
+            if "content" in message:
+                content_tokens = encoding.encode(message["content"])
+                if len(content_tokens) > tokens_to_remove:
+                    message["content"] = encoding.decode(
+                        content_tokens[tokens_to_remove:]
+                        # content_tokens[:-tokens_to_remove]
+                    )
+                    break
+                else:
+                    tokens_to_remove -= len(content_tokens)
+                    message["content"] = ""
+    print("======================DEBUG  END : payload======================")
+    print("======================DEBUG START: after cut======================")
+    print(payload)
+    print("======================DEBUG  END : after cut======================")
 
     # Convert the modified body back to JSON
     payload = json.dumps(payload)

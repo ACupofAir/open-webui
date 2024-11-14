@@ -1177,6 +1177,7 @@ async def generate_chat_completions(
         else:
             return convert_response_ollama_to_openai(response)
     else:
+        # [JuneNote] using /openai/api/chat endpoint
         return await generate_openai_chat_completion(form_data, user=user)
 
 

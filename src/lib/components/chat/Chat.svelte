@@ -1017,6 +1017,7 @@
 					if (model?.owned_by === 'ollama') {
 						_response = await sendPromptOllama(model, prompt, responseMessageId, _chatId);
 					} else if (model) {
+					//[JuneNote]  Prompt here is still the input of box
 						_response = await sendPromptOpenAI(model, prompt, responseMessageId, _chatId);
 					}
 					_responses.push(_response);
@@ -1489,6 +1490,7 @@
 		await tick();
 
 		try {
+			// [JuneNote] the params is the controls params, and you need set it mannual, it will be used in the request body, otherwise, it will use the default value
 			const stream =
 				model?.info?.params?.stream_response ??
 				$settings?.params?.stream_response ??
@@ -1497,6 +1499,7 @@
 
 			const [res, controller] = await generateOpenAIChatCompletion(
 				localStorage.token,
+				// [JuneNote] request body
 				{
 					stream: stream,
 					model: model.id,
@@ -1563,6 +1566,7 @@
 					frequency_penalty:
 						params?.frequency_penalty ?? $settings?.params?.frequency_penalty ?? undefined,
 					max_tokens: params?.max_tokens ?? $settings?.params?.max_tokens ?? undefined,
+					num_ctx: params?.num_ctx ?? $settings?.params?.num_ctx ?? undefined,
 					tool_ids: selectedToolIds.length > 0 ? selectedToolIds : undefined,
 					files: files.length > 0 ? files : undefined,
 					session_id: $socket?.id,
