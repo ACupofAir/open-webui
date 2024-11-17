@@ -389,9 +389,6 @@ async def generate_chat_completion(
     user=Depends(get_verified_user),
 ):
     idx = 0
-    print("======================DEBUG START: form_data======================")
-    print(form_data)
-    print("======================DEBUG  END : form_data======================")
     payload = {**form_data}
 
     if "metadata" in payload:
@@ -442,11 +439,7 @@ async def generate_chat_completion(
         payload["messages"][0]["role"] = "user"
 
     # [JuneNote] I think here should handle prompt length to match the max_token_length
-    print("======================DEBUG START: payload======================")
-    print(payload)
-    start_time = time.time()
     # encoding = tiktoken.get_encoding("cl100k_base")
-
     encoding = tiktoken.get_encoding(str(app.state.config.TIKTOKEN_ENCODING_NAME))
 
     if "num_ctx" in payload:
@@ -454,9 +447,6 @@ async def generate_chat_completion(
         del payload["num_ctx"]
     else:
         max_prompt_token_length = 2048
-    print('======================DEBUG START: max_prompt_token_length======================')
-    print(max_prompt_token_length)
-    print('======================DEBUG  END : max_prompt_token_length======================')
 
     # Calculate the total tokens in all messages
     total_tokens_length = sum(
@@ -464,8 +454,6 @@ async def generate_chat_completion(
         for message in payload["messages"]
         if "content" in message
     )
-    end_time = time.time()
-    print(f"DEBUG: Time elapsed: {end_time - start_time}")
 
     # If total tokens exceed max_token_length, truncate messages from first to last
     if total_tokens_length > max_prompt_token_length:
@@ -482,10 +470,6 @@ async def generate_chat_completion(
                 else:
                     tokens_to_remove -= len(content_tokens)
                     message["content"] = ""
-    print("======================DEBUG  END : payload======================")
-    print("======================DEBUG START: after cut======================")
-    print(payload)
-    print("======================DEBUG  END : after cut======================")
 
     # Convert the modified body back to JSON
     payload = json.dumps(payload)
