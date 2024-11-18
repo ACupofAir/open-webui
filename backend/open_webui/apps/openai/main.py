@@ -443,7 +443,7 @@ async def generate_chat_completion(
     encoding = tiktoken.get_encoding(str(app.state.config.TIKTOKEN_ENCODING_NAME))
 
     if "num_ctx" in payload:
-        max_prompt_token_length = int(payload["num_ctx"] * 0.95)
+        max_prompt_token_length = int(payload["num_ctx"])
         del payload["num_ctx"]
     else:
         max_prompt_token_length = 2048
